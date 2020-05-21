@@ -89,10 +89,6 @@ private:
         HASTE_MULTIPLIER = 1.0;
     }
 
-    void reset_HA()
-    {
-        HA_ON_CD = false;
-    }
 
     void finish_AW()
     {
@@ -101,10 +97,6 @@ private:
         HS_CD_MULTIPLIER = 1.0;
     }
 
-    void reset_AW()
-    {
-        AW_ON_CD = false;
-    }
 
     void process_CONS_tick()
     {
@@ -128,7 +120,13 @@ private:
         // TODO
     }
 
-    void ADD_STATIC_EVENT(int duration, void (HolyPaladin::* foo) ())
+    void START_STATIC_COOLDOWN(int static_cooldown, bool* flag)
+    {
+        *flag = true;
+        // TODO
+    }
+
+    void START_STATIC_PROC(int duration, void (HolyPaladin::* foo) ())
     {
         static_events.push(make_pair(TIME + duration, foo));
     }
@@ -194,11 +192,9 @@ public:
         if (GCD_WINDOW or HA_ON_CD) __assume(false);
 
         HASTE_MULTIPLIER = 1.3;
-        ADD_STATIC_EVENT(HA_DURATION, &HolyPaladin::finish_HA);
+        START_STATIC_PROC(HA_DURATION, &HolyPaladin::finish_HA);
 
-        HA_ON_CD = true;
-        ADD_STATIC_EVENT(HA_CD, &HolyPaladin::reset_HA);
-
+        START_STATIC_COOLDOWN(HA_CD, &HA_ON_CD);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
     };
 
@@ -210,11 +206,9 @@ public:
         DEF_DAMAGE_MULTIPLIER = 1.3; // Increases all damage by 30%
         CRIT = CRIT + 30.0; // Increases crit chance by 30%
         HS_CD_MULTIPLIER = 0.5; // Reduces cooldown of HS by 2 due to Sanctified Wrath
-        ADD_STATIC_EVENT(AW_DURATION, &HolyPaladin::finish_AW);
+        START_STATIC_PROC(AW_DURATION, &HolyPaladin::finish_AW);
 
-        AW_ON_CD = true;
-        ADD_STATIC_EVENT(AW_CD, &HolyPaladin::reset_AW);
-
+        START_STATIC_COOLDOWN(AW_CD, &AW_ON_CD);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
     };
 
