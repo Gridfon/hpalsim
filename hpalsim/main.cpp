@@ -268,12 +268,39 @@ public:
     {
         if (GCD_WINDOW or CONS_ON_CD) __assume(false);
 
-        START_CONS_TICKS(); // TICKING DAMAG
+        START_CONS_TICKS(); // TICKING DAMAGE
         START_STATIC_PROC(&HolyPaladin::START_CONS, CONS_DURATION, &HolyPaladin::FINISH_CONS);
 
         START_DYNAMIC_COOLDOWN(BASE_CONS_CD, &CONS_ON_CD);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
     };
+
+    void TRINKET_CLAW()
+    {
+        // TODO
+    }
+
+    void TRINKET_MANIFESTO()
+    {
+        // TODO
+    }
+
+    void POT_INT()
+    {
+        // 25 sec duration, 60 sec CD
+        // TODO
+    }
+
+    void POT_UNBRIDLED()
+    {
+        // 1 min durationwa 
+        // TODO
+    }
+
+    void POT_RESOLVE()
+    {
+        // 25 sec duration
+    }
 };
 
 int main()
