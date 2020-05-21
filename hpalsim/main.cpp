@@ -7,7 +7,7 @@ using namespace std;
 class HolyPaladin;
 typedef pair<double, void (HolyPaladin::*) ()> event_pair;
 
-enum dynamic_spells { HOLY_SHOCK, CRUSADER_STRIKE, OTHER };
+enum class DynamicSpells { HOLY_SHOCK, CRUSADER_STRIKE, OTHER };
 
 struct event_pair_comp
 {
@@ -51,15 +51,15 @@ private:
     const double BASE_CONS_CD = 4.5;
 
     // Buffs
-    const int BUFF_FOOD = 93;
     const int BUFF_FLASK = 360;
     const int BUFF_RUNE = 60;
+
+    const double BUFF_FOOD = 93.0;
     const double BUFF_SCROLL = 1.07;
     const double BUFF_MAGE = 1.1;
          
     // DAMAGE per TIME
-    double TIME;
-    int DAMAGE;
+    double TIME, DAMAGE;
 
     // Stats, in percentages
     int INT;
@@ -67,14 +67,14 @@ private:
 
     // Multipliers
     bool JUDGE_MULTIPLIER; // JUDGE affects next CS/HS
-    double DEF_DAMAGE_MULTIPLIER; // Set by Awenging Wrath
+    double BASE_DAMAGE_MULTIPLIER; // Set by Awenging Wrath
     double CRIT_DAMAGE_MULTIPLIER; // Default value 2.0, changed by Strikethrough corruption
     double HASTE_MULTIPLIER; // Haste: X% -> ((100+X) * HASTE_MULTIPLIER - 100)%
     double INT_MULTIPLIER; // Mage buff or INT scroll
     double HS_CD_MULTIPLIER; // Set by Awenging Wrath
 
     // Ability cooldowns and charges
-    bool HA_ON_CD, AW_ON_CD, JUDGE_ON_CD, HS_ON_CD, CS_ON_CD, CONS_ON_CD;
+    bool HA_ON_CD, AW_ON_CD, JUDGE_ON_CD, HS_ON_CD, CONS_ON_CD;
     int CS_CHARGES;
 
     // Are we in GCD right now?
@@ -84,15 +84,12 @@ private:
     priority_queue<event_pair, vector<event_pair>, event_pair_comp> static_events; // time -> event
     //multimap<float, int> dynamic_cooldowns; // remaining cooldown -> event
 
-    void finish_HA()
-    {
-        HASTE_MULTIPLIER = 1.0;
-    }
+    void FINISH_HA() { HASTE_MULTIPLIER = 1.0; }
+    void FINISH_CS() { CS_CHARGES += 1; }
 
-
-    void finish_AW()
+    void FINISH_AW()
     {
-        DEF_DAMAGE_MULTIPLIER = 1.0;
+        BASE_DAMAGE_MULTIPLIER = 1.0;
         CRIT = CRIT - 30.0;
         HS_CD_MULTIPLIER = 1.0;
     }
@@ -103,16 +100,28 @@ private:
         // Base damage per tick: 0.109 * CURRENT_INT
     }
 
-    void finish_CONS()
+    void FINISH_CONS()
     {
         // TODO
     }
+
+    void START_CONS()
+    {
+        // TODO
+    }
+
 
     bool roll_for_crit(double crit_chance) // crit_chance in [0, 100]
     {
         // TODO
         return false;
     }
+
+    void START_DYNAMIC_COOLDOWN(int dynamic_cooldown, void (HolyPaladin::* finish) ())
+    {
+        // TODO
+    }
+
 
     void START_DYNAMIC_COOLDOWN(int dynamic_cooldown, bool *flag)
     {
@@ -126,9 +135,14 @@ private:
         // TODO
     }
 
-    void START_STATIC_PROC(int duration, void (HolyPaladin::* foo) ())
+    void START_STATIC_PROC(void (HolyPaladin::* start) (), int duration, void (HolyPaladin::* finish) ())
     {
-        static_events.push(make_pair(TIME + duration, foo));
+        static_events.push(make_pair(TIME + duration, finish));
+    }
+
+    void START_STATIC_PROC(int duration, void (HolyPaladin::* finish) ())
+    {
+        static_events.push(make_pair(TIME + duration, finish));
     }
 
     void REDUCE_HS_CD()
@@ -136,10 +150,14 @@ private:
         //TODO
     }
 
-    void DEAL_DAMAGE(double damage_coefficient, dynamic_spells spell)
+    void START_CONS_TICKS()
+    {
+    }
+
+    void DEAL_DAMAGE(double damage_coefficient, DynamicSpells spell)
     {
         double crit_chance;
-        if (spell == HOLY_SHOCK)
+        if (spell == DynamicSpells::HOLY_SHOCK)
             crit_chance = CRIT + 30.0;
         else
             crit_chance = CRIT;
@@ -147,8 +165,8 @@ private:
 
         double effective_int = INT * INT_MULTIPLIER;
         double base_damage = damage_coefficient * effective_int;
-        double adjusted_damage = base_damage * DEF_DAMAGE_MULTIPLIER;
-        if (spell == HOLY_SHOCK or spell == CRUSADER_STRIKE)
+        double adjusted_damage = base_damage * BASE_DAMAGE_MULTIPLIER;
+        if (spell == DynamicSpells::HOLY_SHOCK or spell == DynamicSpells::CRUSADER_STRIKE)
         {
             adjusted_damage = adjusted_damage * JUDGE_MULTIPLIER;
             JUDGE_MULTIPLIER = 1.0;
@@ -169,19 +187,21 @@ public:
     HolyPaladin(int INT_ON_GEAR, int CRIT_ON_GEAR, int HASTE_ON_GEAR, int VERSA_ON_GEAR, bool MAGE_BUFF)
     {
         TIME = 0.0;
-        DAMAGE = 0;
-        JUDGE_MULTIPLIER = 1.0; 
-        DEF_DAMAGE_MULTIPLIER = 1.0; // only changed by Avenging Wrath
-        CRIT_DAMAGE_MULTIPLIER = 2.0; // only changed by Strikethrough corruption
-        HASTE_MULTIPLIER = 1.0; // only changed by Holy Avenger
-        HS_CD_MULTIPLIER = 1.0; // only changed by Avenging Wrath
+        DAMAGE = 0.0;
+
         INT = BASE_INT + INT_ON_GEAR + BUFF_FLASK + BUFF_RUNE;
-        if (MAGE_BUFF) INT_MULTIPLIER = BUFF_MAGE; else INT_MULTIPLIER = BUFF_SCROLL;
         CRIT = BASE_CRIT + (CRIT_ON_GEAR / CRIT_RATING);
         HASTE = (HASTE_ON_GEAR / HASTE_RATING);
         VERSA = ((VERSA_ON_GEAR + BUFF_FOOD) / VERSA_RATING);
 
-        HA_ON_CD = AW_ON_CD = JUDGE_ON_CD = HS_ON_CD = CS_ON_CD = CONS_ON_CD = false;
+        if (MAGE_BUFF) INT_MULTIPLIER = BUFF_MAGE; else INT_MULTIPLIER = BUFF_SCROLL;
+        JUDGE_MULTIPLIER = 1.0; // Judgement into CS or HS
+        BASE_DAMAGE_MULTIPLIER = 1.0; // only changed by Avenging Wrath
+        CRIT_DAMAGE_MULTIPLIER = 2.0; // only changed by Strikethrough corruption
+        HASTE_MULTIPLIER = 1.0; // only changed by Holy Avenger
+        HS_CD_MULTIPLIER = 1.0; // only changed by Avenging Wrath
+
+        HA_ON_CD = AW_ON_CD = JUDGE_ON_CD = HS_ON_CD = CONS_ON_CD = false;
         CS_CHARGES = 2;
 
         GCD_WINDOW = false;
@@ -192,7 +212,7 @@ public:
         if (GCD_WINDOW or HA_ON_CD) __assume(false);
 
         HASTE_MULTIPLIER = 1.3;
-        START_STATIC_PROC(HA_DURATION, &HolyPaladin::finish_HA);
+        START_STATIC_PROC(HA_DURATION, &HolyPaladin::FINISH_HA);
 
         START_STATIC_COOLDOWN(HA_CD, &HA_ON_CD);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
@@ -203,10 +223,10 @@ public:
     {
         if (GCD_WINDOW or AW_ON_CD) __assume(false);
 
-        DEF_DAMAGE_MULTIPLIER = 1.3; // Increases all damage by 30%
+        BASE_DAMAGE_MULTIPLIER = 1.3; // Increases all damage by 30%
         CRIT = CRIT + 30.0; // Increases crit chance by 30%
         HS_CD_MULTIPLIER = 0.5; // Reduces cooldown of HS by 2 due to Sanctified Wrath
-        START_STATIC_PROC(AW_DURATION, &HolyPaladin::finish_AW);
+        START_STATIC_PROC(AW_DURATION, &HolyPaladin::FINISH_AW);
 
         START_STATIC_COOLDOWN(AW_CD, &AW_ON_CD);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
@@ -216,7 +236,7 @@ public:
     {
         if (GCD_WINDOW or JUDGE_ON_CD) __assume(false);
         JUDGE_MULTIPLIER = 1.3; // Next CS or HS increased by 30%; we assume this debuff will be used before it expires
-        DEAL_DAMAGE(1.125, OTHER);
+        DEAL_DAMAGE(1.125, DynamicSpells::OTHER);
         START_DYNAMIC_COOLDOWN(BASE_JUDGE_CD, &JUDGE_ON_CD);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
     };
@@ -224,22 +244,23 @@ public:
     void HS()
     {
         if (GCD_WINDOW or HS_ON_CD) __assume(false);
-        DEAL_DAMAGE(0.77, HOLY_SHOCK);
+        DEAL_DAMAGE(0.77, DynamicSpells::HOLY_SHOCK);
         START_DYNAMIC_COOLDOWN(BASE_HS_CD * HS_CD_MULTIPLIER, &HS_ON_CD); // Cooldown affected by Sanctified Wrath
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
     };
 
     void CS() // with Crusader's Might
     {
-        if (GCD_WINDOW or CS_ON_CD) __assume(false);
+        if (GCD_WINDOW or CS_CHARGES == 0) __assume(false);
 
-        DEAL_DAMAGE(0.5568, CRUSADER_STRIKE);
-        // Base damage on Rezan: 0.5568 * CURRENT_INT
-        // (Base damage on tooltip: 0.795 * CURRENT_INT)
+        DEAL_DAMAGE(0.5568, DynamicSpells::CRUSADER_STRIKE);
+        // Base damage on Rezan and Stalker: 0.5568 * CURRENT_INT
+        // Base damage on tooltip: 0.795 * CURRENT_INT
 
         if (HS_ON_CD) REDUCE_HS_CD(); // Reduces HS CD by 1.5 sec
 
-        START_DYNAMIC_COOLDOWN(BASE_CS_CD, &CS_ON_CD);
+        CS_CHARGES -= 1;
+        START_DYNAMIC_COOLDOWN(BASE_CS_CD, &HolyPaladin::FINISH_CS);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
     };
 
@@ -247,10 +268,8 @@ public:
     {
         if (GCD_WINDOW or CONS_ON_CD) __assume(false);
 
-        // TODO: DEAL TICK DAMGE
-
-        ADD_STATIC_EVENT(CONS_DURATION, &HolyPaladin::finish_CONS);
-        // TODO: handle reniewing this
+        START_CONS_TICKS(); // TICKING DAMAG
+        START_STATIC_PROC(&HolyPaladin::START_CONS, CONS_DURATION, &HolyPaladin::FINISH_CONS);
 
         START_DYNAMIC_COOLDOWN(BASE_CONS_CD, &CONS_ON_CD);
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
