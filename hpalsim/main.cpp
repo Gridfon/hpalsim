@@ -1,14 +1,12 @@
 #include <iostream>
 #include <queue>
 #include <algorithm>
-//#include <map>
+#include <map>
 using namespace std;
 
 class HolyPaladin;
+
 typedef pair<double, void (HolyPaladin::*) ()> event_pair;
-
-enum class DynamicSpells { HOLY_SHOCK, CRUSADER_STRIKE, OTHER };
-
 struct event_pair_comp
 {
     bool operator()(event_pair const& lhs, event_pair const& rhs)
@@ -16,6 +14,12 @@ struct event_pair_comp
         return lhs.first > rhs.first;
     }
 };
+
+enum class DynamicSpells { HOLY_SHOCK, CRUSADER_STRIKE, OTHER };
+enum class EquipmentSlot { HEAD, NECK, SHOULDER, BACK, CHEST, WRIST, WEAPON, SHIELD, HANDS, WAIST, LEGS, FEET, FINGER, TRINKET};
+const int SOCKETABLE_EQUIPMENT_SLOTS = 11;
+
+
 
 /*
 TODO:
@@ -27,58 +31,56 @@ TODO:
 class HolyPaladin
 {
 private:
-    const int BASE_INT = 1469;
-    const int BASE_CRIT = 6; // percent    
+    double TIME;
+    map<pair<int, int>, double> DAMAGE; // <crit, versa> ratings -> base damage done
 
     // Stat points for 1%
-    const double VERSA_RATING = 85.0;
-    const double CRIT_RATING = 72.0;
-    const double HASTE_RATING = 68.0;
+    const int CRIT_IN_ONE_PERCENT = 72;
+    const int HASTE_IN_ONE_PERCENT = 68;
+    const int VERSA_IN_ONE_PERCENT = 85;
 
-    // Const seconds
+    // Base stats
+    const int BASE_INT = 1469;
+    const int BASE_CRIT_RATING = 6 * CRIT_RATING; // 6% worth of stat points; is NOT affected by SEVERE corruption
+
+    // Stats (secondaries - as rating points)
+    int INT, CRIT_RATING, HASTE_RATING, VERSA_RATING;
+
+    // Durations in seconds
     const int CONS_DURATION = 12;
     const int HA_DURATION = 20;
-    const int HA_CD = 90;
-    const double AW_DURATION = (20.0 + 5.0) * 1.25; // with Light's Decree and Sanctified Wrath
-    const int AW_CD = 90; // with Vision of Perfection
+    const double AW_DURATION = (20.0 + 5.0) * 1.25; // extended by Light's Decree and Sanctified Wrath
 
-    // Seconds, reduced by haste
-    // X% haste -> cooldown is BASE_CD / ((100+X) / 100)
+    // Cooldowns in seconds
+    const int HA_CD = 90;
+    const int AW_CD = 90; // reduced by Vision of Perfection
+    // The following are reduced by haste: X% haste -> cooldown is BASE_CD / ((100+X) / 100)
     const double BASE_GCD = 1.5;
     const int BASE_JUDGE_CD = 12;
     const int BASE_HS_CD = 9;
     const int BASE_CS_CD = 6; // 2 charges
     const double BASE_CONS_CD = 4.5;
 
-    // Buffs
+    // Flat buffs 
     const int BUFF_FLASK = 360;
     const int BUFF_RUNE = 60;
-
-    const double BUFF_FOOD = 93.0;
-    const double BUFF_SCROLL = 1.07;
-    const double BUFF_MAGE = 1.1;
-         
-    // DAMAGE per TIME
-    double TIME, DAMAGE;
-
-    // Stats, in percentages
-    int INT;
-    double CRIT, HASTE, VERSA;
+    const int BUFF_FOOD = 93; // usually versatility
 
     // Multipliers
-    bool JUDGE_MULTIPLIER; // JUDGE affects next CS/HS
-    double BASE_DAMAGE_MULTIPLIER; // Set by Awenging Wrath
-    double CRIT_DAMAGE_MULTIPLIER; // Default value 2.0, changed by Strikethrough corruption
+    const double BUFF_SCROLL = 1.07;
+    const double BUFF_MAGE = 1.1;
+    double INT_MULTIPLIER; // either mage buff or itellect scroll
+
+    double BASE_DAMAGE_MULTIPLIER; // affected by Awenging Wrath
+    double CRIT_DAMAGE_MULTIPLIER; // default value is 2.0; can be increased by Strikethrough corruption
     double HASTE_MULTIPLIER; // Haste: X% -> ((100+X) * HASTE_MULTIPLIER - 100)%
-    double INT_MULTIPLIER; // Mage buff or INT scroll
-    double HS_CD_MULTIPLIER; // Set by Awenging Wrath
+    double HS_CD_MULTIPLIER; // reduced by Awenging Wrath
 
-    // Ability cooldowns and charges
+    // Current state
+    bool JUDGE_MULTIPLIER; // next CS or HS is affected by Judgment buff
     bool HA_ON_CD, AW_ON_CD, JUDGE_ON_CD, HS_ON_CD, CONS_ON_CD;
+    bool GCD_WINDOW; // are we in GCD right now?
     int CS_CHARGES;
-
-    // Are we in GCD right now?
-    bool GCD_WINDOW;
 
     // Event queues
     priority_queue<event_pair, vector<event_pair>, event_pair_comp> static_events; // time -> event
@@ -275,12 +277,13 @@ public:
         START_DYNAMIC_COOLDOWN(BASE_GCD, &GCD_WINDOW);
     };
 
-    void TRINKET_CLAW()
+    // Trinkets and pots have no GCD
+    void TRINKET_CLAW() // 2 min CD -- 20 sec on other trinket
     {
         // TODO
     }
 
-    void TRINKET_MANIFESTO()
+    void TRINKET_MANIFESTO() // 1m 30 sec CD -- 20 sec on other trinket
     {
         // TODO
     }
@@ -297,10 +300,19 @@ public:
         // TODO
     }
 
-    void POT_RESOLVE()
-    {
-        // 25 sec duration
-    }
+    // TODO: bloodlust vs. drums
+    // drums are 25% multiplicative haste for 40 sec
+    // bloodlust is 30% 
+    // TODO: white damage
+    // TODO: assign damage to buckets, each for different crit rate
+
+    // TODO: Glimmer of Lightx3
+    // TODO: Indomitable Justicex2
+
+    // TODO: Glimmer is affected by crit and versa, but not intellect
+    // TODO: Judge+IJ affected by crit and versa, but not intellect
+
+    // TODO: divine purpose: 20% holy shock repeated
 };
 
 int main()
